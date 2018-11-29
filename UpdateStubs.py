@@ -16,7 +16,7 @@ import linecache
 # inputData1 =
 
 dataHandler = {'declarations': ['GlobalDeclarationsList.xlsx', 'Global Declarations', 'A:B', OFF],
-               'functions': ['ForMCUAppMethod.xlsx', 'Function Calls', 'A:B', OFF]}
+               'functions': ['RTEFunctionCalls.xlsx', 'RTE Function Calls', 'A:B', OFF]}
 
 
 def filter_data(args):
@@ -40,7 +40,7 @@ def filter_data(args):
                         spaces = ''
                     else:
                         string = '<< Start of runnable implementation >>'
-                        column_name = 'Function_Name'
+                        column_name = 'FunctionCalls'
                         skip_count = 3
                         spaces = '  '
 
@@ -64,11 +64,13 @@ debug = True
 # Read arguments
 parser = argparse.ArgumentParser()
 if debug:
-    parser.add_argument('-d', dest='section', help='for debugging', default='declarations')
+    parser.add_argument('-d', dest='section', help='for debugging', default='functions')
 else:
     parser.add_argument('section', help='part of the stubs to update', choices=['declarations', 'functions'])
 parser.add_argument('-s', dest='stubs_folder', help='stubs folder', default='Stubs/')
-# parser.add_argument('-i', dest='input_file', help='input file', default='GlobalDeclarations.xlsx')
 args = parser.parse_args()
 
-filter_data(args)
+if not os.path.exists(args.stubs_folder):
+    print('{} not found!'.format(args.stubs_folder))
+else:
+    filter_data(args)

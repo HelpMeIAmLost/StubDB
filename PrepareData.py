@@ -82,7 +82,9 @@ def create_data_list(cdl_data_frame, cdl_conn):
     cdl_data_frame['source_signame'] = replace(cdl_data_frame, 'source_signame', 'HALTフラグ', np.nan)
     # FSモデルに出力追加の予定 -> np.nan
     cdl_data_frame['source_signame'] = replace(cdl_data_frame, 'source_signame', 'FSモデルに出力追加の予定', np.nan)
-    print('Removed \'HALTフラグ\' and \'FSモデルに出力追加の予定\' in source signal name')
+    # 車種パラに追加予定-> np.nan
+    cdl_data_frame['source_signame'] = replace(cdl_data_frame, 'source_signame', '車種パラに追加予定', np.nan)
+    print('Removed \'HALTフラグ\', \'FSモデルに出力追加の予定\' and \'車種パラに追加予定\' in source signal name')
 
     # Extract just the signal name from model_signal_name and remove [] and ()
     cdl_data_frame[signal_name] = reg_replace(
@@ -404,50 +406,6 @@ def create_data_list(cdl_data_frame, cdl_conn):
         execute_sql(cdl_conn, sql_external_signal, external_signal_data)
 
 
-def create_connection(db_file):
-    """ create a database connection to the SQLite database
-        specified by db_file
-    :param db_file: database file
-    :return: Connection object or None
-    """
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except Error as e:
-        print(e)
-
-    return None
-
-
-def execute_sql(conn, sql_statement, values=None):
-    """ create a table from the create_table_sql statement
-    :param conn: Connection object
-    :param sql_statement: SQL statement
-    :param values: Values to INSERT, in case SQL statement is INSERT request
-    :return:
-    """
-    try:
-        c = conn.cursor()
-        if values is None:
-            c.execute(sql_statement)
-        else:
-            if np.nan in values or '-' in values or '―' in values or 'ー' in values:
-                # pass
-                print(values)
-            else:
-                c.execute(sql_statement, values)
-    except Error as e:
-        if e.__str__().find('UNIQUE constraint failed:') == -1:
-            print(e, values if values is not None else None)
-        else:
-            pass
-
-
-def commit_disconnect_database(connection):
-    connection.commit()
-    connection.close()
-
-
 debug = True
 parser = argparse.ArgumentParser()
 if debug:
@@ -455,67 +413,71 @@ if debug:
 else:
     parser.add_argument('input_file', help='IF specification file')
 args = parser.parse_args()
-#             Sheet name , Use cols                , Skip rows
-#             [0]        , [1]                     , [2]
-input_data = ['Interface', 'A, B, D, E, I, J, K, L', 12]
 
-# create a database connection
-conn = create_connection("interface.db")
-if conn is not None:
-    # Drop tables first, if they exist
-    sql_statement = '''DROP TABLE IF EXISTS internal_signals;'''
-    execute_sql(conn, sql_statement)
-    sql_statement = ''' DROP TABLE IF EXISTS external_signals; '''
-    execute_sql(conn, sql_statement)
-    sql_statement = ''' DROP TABLE IF EXISTS io_pairing; '''
-    execute_sql(conn, sql_statement)
-
-    # For the address, convert hex to int (int("0xdeadbeef", 0))
-    # APP
-    sql_statement = '''CREATE TABLE IF NOT EXISTS internal_signals (
-        module text NOT NULL, 
-        name text NOT NULL, 
-        address integer NOT NULL, 
-        link text PRIMARY KEY NOT NULL, 
-        data_type text, 
-        data_size integer, 
-        array_size text, 
-        cycle_ms integer
-    );'''
-    execute_sql(conn, sql_statement)
-
-    # CAN, IPC, etc.
-    sql_statement = '''CREATE TABLE IF NOT EXISTS external_signals (
-                                        name TEXT PRIMARY KEY NOT NULL,
-                                        node TEXT NOT NULL,
-                                        id INTEGER NOT NULL,
-                                        ch INTEGER NOT NULL,
-                                        byte INTEGER NOT NULL,
-                                        bit INTEGER NOT NULL,
-                                        factor BLOB,
-                                        min BLOB,
-                                        max BLOB,
-                                        cycle_ms INTEGER
-                                    );'''
-    execute_sql(conn, sql_statement)
-
-    # Input-output pairing
-    sql_statement = '''CREATE TABLE IF NOT EXISTS io_pairing (
-        id integer NOT NULL PRIMARY KEY,
-        source_module text NOT NULL, 
-        source_signal text NOT NULL, 
-        destination_module text NOT NULL, 
-        destination_signal text NOT NULL 
-    );'''
-    execute_sql(conn, sql_statement)
+if not os.path.exists(args.input_file):
+    print('{} not found!'.format(args.input_file))
 else:
-    print("Error! cannot create the database connection.")
+    #             Sheet name , Use cols                , Skip rows
+    #             [0]        , [1]                     , [2]
+    input_data = ['Interface', 'A, B, D, E, I, J, K, L', 12]
 
-# filename = args.input_file
-print('Creating data frame from {}'.format(args.input_file))
-data_frame = read_excel_file(args.input_file, input_data)
-create_data_list(data_frame, conn)
+    # create a database connection
+    conn = create_connection("interface.db")
+    if conn is not None:
+        # Drop tables first, if they exist
+        sql_statement = '''DROP TABLE IF EXISTS internal_signals;'''
+        execute_sql(conn, sql_statement)
+        sql_statement = ''' DROP TABLE IF EXISTS external_signals; '''
+        execute_sql(conn, sql_statement)
+        sql_statement = ''' DROP TABLE IF EXISTS io_pairing; '''
+        execute_sql(conn, sql_statement)
 
-commit_disconnect_database(conn)
+        # For the address, convert hex to int (int("0xdeadbeef", 0))
+        # APP
+        sql_statement = '''CREATE TABLE IF NOT EXISTS internal_signals (
+            module text NOT NULL, 
+            name text NOT NULL, 
+            address integer NOT NULL, 
+            link text PRIMARY KEY NOT NULL, 
+            data_type text, 
+            data_size integer, 
+            array_size text, 
+            cycle_ms integer
+        );'''
+        execute_sql(conn, sql_statement)
 
-print('Done preparing interface I/O data for testing')
+        # CAN, IPC, etc.
+        sql_statement = '''CREATE TABLE IF NOT EXISTS external_signals (
+                                            name TEXT PRIMARY KEY NOT NULL,
+                                            node TEXT NOT NULL,
+                                            id INTEGER NOT NULL,
+                                            ch INTEGER NOT NULL,
+                                            byte INTEGER NOT NULL,
+                                            bit INTEGER NOT NULL,
+                                            factor BLOB,
+                                            min BLOB,
+                                            max BLOB,
+                                            cycle_ms INTEGER
+                                        );'''
+        execute_sql(conn, sql_statement)
+
+        # Input-output pairing
+        sql_statement = '''CREATE TABLE IF NOT EXISTS io_pairing (
+            id integer NOT NULL PRIMARY KEY,
+            source_module text NOT NULL, 
+            source_signal text NOT NULL, 
+            destination_module text NOT NULL, 
+            destination_signal text NOT NULL 
+        );'''
+        execute_sql(conn, sql_statement)
+    else:
+        print("Error! cannot create the database connection.")
+
+    # filename = args.input_file
+    print('Creating data frame from {}'.format(args.input_file))
+    data_frame = read_excel_file(args.input_file, input_data)
+    create_data_list(data_frame, conn)
+
+    commit_disconnect_database(conn)
+
+    print('Done preparing interface I/O data for testing')

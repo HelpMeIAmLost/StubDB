@@ -6,6 +6,7 @@ import sqlite3
 import argparse
 import os
 import pandas as pd
+import numpy as np
 
 OFF = 0
 ON = 1
@@ -42,9 +43,16 @@ def execute_sql(conn, sql_statement, values=None, select=False):
             if select:
                 return c.fetchall()
         else:
-            c.execute(sql_statement, values)
+            if np.nan in values or '-' in values or '―' in values or 'ー' in values:
+                pass
+            else:
+                c.execute(sql_statement, values)
     except Error as e:
-        print(e)
+        if e.__str__().find('UNIQUE constraint failed:') == -1:
+            print(e, values if values is not None else None)
+        else:
+            # Ignore failed INSERT request for duplicate values
+            pass
 
 
 def commit_disconnect_database(conn):
