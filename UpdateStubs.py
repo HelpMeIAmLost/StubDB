@@ -3,25 +3,15 @@ from StringUtils import *
 from pathlib import Path
 
 import os
-import re
-import sys
 import argparse
-import numpy as np
-import linecache
 
-
-# #             Sheet name , Use cols
-# #             [0]        , [1]
-# inputData0 =
-# inputData1 =
-
-dataHandler = {'declarations': ['GlobalDeclarationsList.xlsx', 'Global Declarations', 'A:B', OFF],
+data_handler = {'declarations': ['GlobalDeclarationsList.xlsx', 'Global Declarations', 'A:B', OFF],
                'functions': ['RTEFunctionCalls.xlsx', 'RTE Function Calls', 'A:B', OFF]}
 
 
 def filter_data(args):
     # From util.py
-    data_frame = read_excel_file(dataHandler[args.section][0], dataHandler[args.section][1:4])
+    data_frame = read_excel_file(data_handler[args.section][0], data_handler[args.section][1:4])
 
     for root, dirs, files in os.walk(Path(args.stubs_folder)):
         for file in files:
@@ -64,7 +54,7 @@ debug = True
 # Read arguments
 parser = argparse.ArgumentParser()
 if debug:
-    parser.add_argument('-d', dest='section', help='for debugging', default='functions')
+    parser.add_argument('-d', dest='section', help='for debugging', default='declarations')
 else:
     parser.add_argument('section', help='part of the stubs to update', choices=['declarations', 'functions'])
 parser.add_argument('-s', dest='stubs_folder', help='stubs folder', default='Stubs/')
@@ -72,5 +62,9 @@ args = parser.parse_args()
 
 if not os.path.exists(args.stubs_folder):
     print('{} not found!'.format(args.stubs_folder))
+    print('Please make sure {} is in the script folder!'.format(args.stubs_folder))
+elif not os.path.exists(data_handler[args.section][0]):
+    print('{} not found!'.format(data_handler[args.section][0]))
+    print('Please run the PrepareData script first!')
 else:
     filter_data(args)
