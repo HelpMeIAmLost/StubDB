@@ -622,7 +622,7 @@ def create_data_list(input_file):
 debug = True
 parser = argparse.ArgumentParser()
 if debug:
-    parser.add_argument('-i', dest='input_file', default='new_【SASB連-2018-21】外部IF定義書_統合用.xlsx')
+    parser.add_argument('-i', dest='input_file', default='【SASB連-2018-21】外部IF定義書_暫定版.xlsx')
 else:
     parser.add_argument('input_file', help='IF specification file')
 args = parser.parse_args()

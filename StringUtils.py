@@ -13,9 +13,10 @@ def replace(data_frame, from_column, str_before, str_replace):
     return data_frame[from_column].replace(str_before, str_replace)
 
 
-def insert_lines_of_code(filename, data_frame, string, skip_count, spaces):
+def insert_lines_of_code(section, filename, data_frame, string, skip_count, spaces):
     """ inserts declarations global variables to the stubs
 
+    :param section: code section to update, declarations or functions
     :param filename: filename of the stub
     :param data_frame: filtered data frame for the current module
     :param string: a line in the stub that indicates the declarations section of the file
@@ -29,16 +30,40 @@ def insert_lines_of_code(filename, data_frame, string, skip_count, spaces):
         line_number = line_number + skip_count
         os.rename(filename, '{}.tmp'.format(filename))
         current_line = 1
+        rte_api_list = []
+        rte_api_list_found = False
         with open('{}.tmp'.format(filename), 'r') as fi:
             with open(filename, 'w') as fo:
                 for line in fi:
+                    if section == 'functions':
+                        if line == ' * Input Interfaces:\n':
+                            rte_api_list_found = True
+                        if rte_api_list_found and line.find(' *   Std_ReturnType ') != -1:
+                            rte_api_list.append(line.split()[2].split('(')[0])
+                        if line.find('<< Start of documentation area >>') != -1:
+                            rte_api_list_found = False
+
                     fo.write(line)
                     current_line += 1
 
                     if current_line == line_number:
                         data = data_frame.tolist()
                         for row in data:
-                            fo.write('{}{}\n'.format(spaces, row))
+                            if section == 'declarations':
+                                fo.write('{}{}\n'.format(spaces, row))
+                            else:
+                                function_name = str(row).split('(')[0]
+                                rte_api_found = False
+                                # Check if the function call to be inserted is in the list of RTE APIs
+                                for rte_api_function in rte_api_list:
+                                    if rte_api_function == function_name:
+                                        rte_api_found = True
+                                        break
+                                if rte_api_found:
+                                    fo.write('{}{}\n'.format(spaces, row))
+                                else:
+                                    fo.write('// {}{}\n'.format(spaces, row))
+                                    continue
             fo.close()
         fi.close()
         os.remove('{}.tmp'.format(filename))

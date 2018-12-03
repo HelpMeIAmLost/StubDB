@@ -37,7 +37,7 @@ def filter_data(args):
                     if module_name == 'acc_main':
                         skip_count += 3
                     filename = os.path.join(root, file)
-                    success = insert_lines_of_code(filename, filtered_data[column_name], string, skip_count, spaces)
+                    success = insert_lines_of_code(args.section, filename, filtered_data[column_name], string, skip_count, spaces)
                     if success:
                         if args.section == 'declarations':
                             print('Finished inserting global declarations for {}'.format(file[:-2]))
@@ -54,7 +54,7 @@ debug = True
 # Read arguments
 parser = argparse.ArgumentParser()
 if debug:
-    parser.add_argument('-d', dest='section', help='for debugging', default='declarations')
+    parser.add_argument('-d', dest='section', help='for debugging', default='functions')
 else:
     parser.add_argument('section', help='part of the stubs to update', choices=['declarations', 'functions'])
 parser.add_argument('-s', dest='stubs_folder', help='stubs folder', default='Stubs/')

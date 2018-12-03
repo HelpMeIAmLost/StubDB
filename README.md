@@ -1,6 +1,6 @@
 # StubDB
 ## Description
-Extract valid interface signals from an interface specification, create a list of global declarations, RTE function calls and update the interface database for testing, and update the stubs by inserting the global declarations and RTE function calls in their respective modules.
+Extract valid interface signals from an interface specification, create a list of global declarations, RTE function calls and update the interface database for testing, and update the stubs by inserting the global declarations and RTE function calls in their respective modules. RTE read/write functions not found in the RTE API list of the stub will have their corresponding function calls commented out to avoid compile errors.
 
 ## Requirements
 Aside from the libraries listed in the requirements.txt file, I used the following:
@@ -14,25 +14,14 @@ Aside from the libraries listed in the requirements.txt file, I used the followi
 
 ## Usage
 ### Before anything else..
-*  DBC files should be in the following folder structure relative to the script folder (DBC file names could be different:
+*  By default, stub files should be place in the `Stubs` folder of the script directory
 ```
-   ./DBC
-      |- <variant 1>
-         |- FILE1_<var 1>.dbc
-         |- FILE2_<var 1>.dbc
-         |- FILE3_<var 1>.dbc
-         |- FILE4_<var 1>.dbc
-      |- <variant 2>
-         |- FILE1_<var 2>.dbc
-         |- FILE2_<var 2>.dbc
-         |- FILE3_<var 2>.dbc
-         |- FILE4_<var 2>.dbc
+   ./Stubs
+      |- A.c
+      |- B.c
+      |- C.c
       :
-      |- <variant n>
-         |- FILE1_<var n>.dbc
-         |- FILE2_<var n>.dbc
-         |- FILE3_<var n>.dbc
-         |- FILE4_<var n>.dbc
+      |- Z.c
 ```
 
 ### Command line syntax
@@ -41,7 +30,7 @@ This package uses 2 Python scripts:
 ```
 py PrepareData.py <interface specification in Excel>
 ```
-*  `UpdateStubs.py` - updates the stubs by inserting the global declarations and RTE function calls in their respective modules
+*  `UpdateStubs.py` - updates the stubs by inserting the global declarations or RTE function calls in their respective modules, by using `declarations` and `functions`, respectively
 ```
 py UpdateStubs.py <declarations/functions> [-s <stub folder path>]
 ```
