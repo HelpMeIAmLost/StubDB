@@ -3,6 +3,7 @@ from StringUtils import *
 
 import numpy as np
 import argparse
+# import unicodedata
 
 # Column header indices
 target_module_col = 0
@@ -205,11 +206,21 @@ def create_interface_database(cdl_data_frame):
         print('Updating the interface database..')
         interface_data_frame = cdl_data_frame
         # Drop tables first, if they exist
+        sql_statement = '''DROP TABLE IF EXISTS error_array;'''
+        execute_sql(conn, sql_statement)
         sql_statement = '''DROP TABLE IF EXISTS internal_signals;'''
         execute_sql(conn, sql_statement)
         sql_statement = ''' DROP TABLE IF EXISTS external_signals; '''
         execute_sql(conn, sql_statement)
         sql_statement = ''' DROP TABLE IF EXISTS io_pairing; '''
+        execute_sql(conn, sql_statement)
+
+        # Error array
+        sql_statement = '''CREATE TABLE IF NOT EXISTS error_array (
+            error_code integer NOT NULL,
+            name text NOT NULL,
+            description text NOT NULL
+        );'''
         execute_sql(conn, sql_statement)
 
         # APP
@@ -227,15 +238,18 @@ def create_interface_database(cdl_data_frame):
 
         # CAN, IPC, etc.
         sql_statement = '''CREATE TABLE IF NOT EXISTS external_signals (
-                                            name TEXT PRIMARY KEY NOT NULL,
+                                            name TEXT NOT NULL,
                                             node TEXT NOT NULL,
+                                            link TEXT PRIMARY KEY NOT NULL,
                                             id INTEGER NOT NULL,
                                             ch INTEGER NOT NULL,
                                             byte INTEGER NOT NULL,
                                             bit INTEGER NOT NULL,
-                                            factor BLOB,
-                                            min BLOB,
-                                            max BLOB,
+                                            length INTEGER NOT NULL,
+                                            factor NUMERIC,
+                                            offset NUMERIC,
+                                            min NUMERIC,
+                                            max NUMERIC,
                                             cycle_ms INTEGER
                                         );'''
         execute_sql(conn, sql_statement)
@@ -246,7 +260,10 @@ def create_interface_database(cdl_data_frame):
             source_module text NOT NULL, 
             source_signal text NOT NULL, 
             destination_module text NOT NULL, 
-            destination_signal text NOT NULL 
+            destination_signal text NOT NULL,
+            status text,
+            result text,
+            notes text
         );'''
         execute_sql(conn, sql_statement)
 
@@ -256,18 +273,59 @@ def create_interface_database(cdl_data_frame):
         source_signal = []
         destination_module = []
         destination_signal = []
+        io_test_status = []
+        io_test_result = []
+        io_notes = []
         # For ExternalSignals.xlsx
         ext_name = []
         ext_node = []
+        ext_link = []
         ext_id = []
         ext_ch = []
         ext_byte = []
         ext_bit = []
+        ext_length = []
         ext_factor = []
+        ext_offset = []
         ext_min = []
         ext_max = []
         ext_cycle_ms = []
 
+        # interface DB -> error_array
+        error_array_data_frame = pd.DataFrame({'error_code': ["0", "16", "17",
+                                                              "18", "32", "33",
+                                                              "34", "35", "36",
+                                                              "37", "38", "39",
+                                                              "40", "41", "42",
+                                                              "48", "49", "50"],
+                                               'name': ["ERR_CMD_SYNCH", "ERR_CMD_BUSY", "ERR_DAQ_ACTIVE",
+                                                        "ERR_PGM_ACTIVE", "ERR_CMD_UNKNOWN", "ERR_CMD_SYNTAX",
+                                                        "ERR_OUT_OF_RANGE", "ERR_WRITE_PROTECTED", "ERR_ACCESS_DENIED",
+                                                        "ERR_ACCESS_LOCKED", "ERR_PAGE_NOT_VALID", "ERR_MODE_NOT_VALID",
+                                                        "ERR_SEGMENT_NOT_VALID", "ERR_SEQUENCE", "ERR_DAQ_CONFIG",
+                                                        "ERR_MEMORY_OVERFLOW", "ERR_GENERIC", "ERR_VERIFY"],
+                                               'description': ["Command processor synchronization",
+                                                               "Command was not executed",
+                                                               "Command rejected because DAQ is running",
+                                                               "Command rejected because PGM is running",
+                                                               "Unknown command or not implemented optional command",
+                                                               "Command syntax invalid",
+                                                               "Command syntax valid but command parameter(s) out of range",
+                                                               "The memory location is write protected",
+                                                               "The memory location is not accessible",
+                                                               "Access denied Seed & Key is required",
+                                                               "Selected page not available",
+                                                               "Selected page mode not available",
+                                                               "Selected segment not valid",
+                                                               "Sequence error",
+                                                               "DAQ configuration not valid",
+                                                               "Memory overflow error",
+                                                               "Generic error",
+                                                               "The slave internal program verify routine detects an error"]
+                                               })
+        # Append to error_array table
+        print('Updating error_array table of interface database')
+        error_array_data_frame.to_sql('error_array', conn, if_exists='append', index=False)
         # interface DB -> internal_signals table
         sql_internal_signal = '''INSERT INTO internal_signals (module, name, address, link, data_type, data_size, array_size, cycle_ms
                             ) VALUES (?,?,?,?,?,?,?,?);'''
@@ -306,6 +364,9 @@ def create_interface_database(cdl_data_frame):
                                       else interface_data_frame.iat[row, destination_module_col])
             destination_signal.append(model_signal if interface_data_frame.iat[row, in_out_col] == 'IN'
                                       else interface_data_frame.iat[row, destination_signal_col])
+            io_test_status.append('Pending')
+            io_test_result.append('N/A')
+            io_notes.append('')
 
             # For external signals
             if interface_data_frame.iat[row, in_out_col] == 'IN':
@@ -319,11 +380,17 @@ def create_interface_database(cdl_data_frame):
                             ext_name.append(interface_data_frame.iat[row, source_signal_col])
                             ext_node.append(interface_data_frame.iat[row, source_module_col]
                                             if interface_data_frame.iat[row, source_module_col] != 'DebugCAN' else 'DBG')
+                            ext_link.append('{}_{}'.format(interface_data_frame.iat[row, source_module_col]
+                                            if interface_data_frame.iat[row, source_module_col] != 'DebugCAN' else 'DBG',
+                                                           interface_data_frame.iat[row, source_signal_col])
+                                            )
                             ext_id.append(test_id)
                             ext_ch.append(0)
                             ext_byte.append(int(interface_data_frame.iat[row, source_signal_col][under_loc + 1:under_loc + 2]))
                             ext_bit.append(int(interface_data_frame.iat[row, source_signal_col][under_loc + 3:under_loc + 4]))
+                            ext_length.append(0)
                             ext_factor.append(0)
+                            ext_offset.append(0)
                             ext_min.append(0)
                             ext_max.append(0)
                             ext_cycle_ms.append(0)
@@ -343,13 +410,19 @@ def create_interface_database(cdl_data_frame):
                             ext_node.append(interface_data_frame.iat[row, destination_module_col]
                                             if interface_data_frame.iat[row, destination_module_col] != 'DebugCAN'
                                             else 'DBG')
+                            ext_link.append('{}_{}'.format(interface_data_frame.iat[row, destination_module_col]
+                                            if interface_data_frame.iat[row, destination_module_col] != 'DebugCAN' else 'DBG',
+                                                           interface_data_frame.iat[row, destination_signal_col])
+                                            )
                             ext_id.append(test_id)
                             ext_ch.append(0)
                             ext_byte.append(int(interface_data_frame.iat[row, destination_signal_col]
                                                 [under_loc + 1:under_loc + 2]))
                             ext_bit.append(int(interface_data_frame.iat[row, destination_signal_col]
                                                [under_loc + 3:under_loc + 4]))
+                            ext_length.append(0)
                             ext_factor.append(0)
+                            ext_offset.append(0)
                             ext_min.append(0)
                             ext_max.append(0)
                             ext_cycle_ms.append(0)
@@ -359,49 +432,43 @@ def create_interface_database(cdl_data_frame):
 
         # For io_pairing table, duplicates need to be removed
         # interface DB -> io_pairing table
-        sql_io_pairing = '''INSERT INTO io_pairing (source_module, source_signal, destination_module, destination_signal)
-                        VALUES (?,?,?,?);'''
+        # sql_io_pairing = '''INSERT INTO io_pairing (source_module, source_signal, destination_module, destination_signal)
+        #                 VALUES (?,?,?,?);'''
         interface_data_frame = pd.DataFrame({'source_module': source_module, 'source_signal': source_signal,
                                              'destination_module': destination_module,
-                                             'destination_signal': destination_signal})
+                                             'destination_signal': destination_signal,
+                                             'status': io_test_status, 'result': io_test_result})
         interface_data_frame.drop_duplicates(inplace=True)
         # Append to io_pairing table
         print('Updating io_pairing table of interface database')
-        for row in range(interface_data_frame.shape[0]):
-            io_pairing_data = (
-                interface_data_frame.iat[row, 0],
-                interface_data_frame.iat[row, 1],
-                interface_data_frame.iat[row, 2],
-                interface_data_frame.iat[row, 3]
-            )
-            execute_sql(conn, sql_io_pairing, io_pairing_data)
+        interface_data_frame.to_sql('io_pairing', conn, if_exists='append', index=False)
+        # for row in range(interface_data_frame.shape[0]):
+        #     io_pairing_data = (
+        #         interface_data_frame.iat[row, 0],
+        #         interface_data_frame.iat[row, 1],
+        #         interface_data_frame.iat[row, 2],
+        #         interface_data_frame.iat[row, 3]
+        #     )
+        #     execute_sql(conn, sql_io_pairing, io_pairing_data)
 
         # For external signals
         # interface DB -> external_signals table
-        sql_external_signal = '''INSERT INTO external_signals (name, node, id, ch, byte, bit, factor, min, max, cycle_ms)
-                            VALUES (?,?,?,?,?,?,?,?,?,?);'''
+        # sql_external_signal = '''INSERT INTO external_signals (name, node, id, ch, byte, bit, factor, offset, min, max, cycle_ms)
+        #                     VALUES (?,?,?,?,?,?,?,?,?,?,?);'''
         print('Updating external_signals table of interface database')
-        interface_data_frame = pd.DataFrame({'SignalName': ext_name, 'Node': ext_node,
-                                             'CAN_ID': ext_id, 'CAN_Ch': ext_ch,
-                                             'ByteNum': ext_byte, 'BitNum': ext_bit,
-                                             'Factor': ext_factor, 'MinValue': ext_min,
-                                             'MaxValue': ext_max, 'Cycle_ms': ext_cycle_ms}
+        interface_data_frame = pd.DataFrame({'name': ext_name, 'node': ext_node,
+                                             'link': ext_link, 'id': ext_id,
+                                             'ch': ext_ch, 'byte': ext_byte,
+                                             'bit': ext_bit, 'length': ext_length,
+                                             'factor': ext_factor, 'offset': ext_offset,
+                                             'min': ext_min, 'max': ext_max,
+                                             'cycle_ms': ext_cycle_ms}
                                             )
+        interface_data_frame.sort_values(by='link', ascending=True, inplace=True)
+        # write_to_excel(interface_data_frame, 'if_before.xlsx', 'blah')
         interface_data_frame.drop_duplicates(inplace=True)
-        for row in range(interface_data_frame.shape[0]):
-            external_signal_data = (
-                interface_data_frame.iat[row, target_module_col],
-                interface_data_frame.iat[row, in_out_col],
-                int(interface_data_frame.iat[row, source_module_col]),
-                int(interface_data_frame.iat[row, source_signal_col]),
-                int(interface_data_frame.iat[row, raw_target_signal_col]),
-                int(interface_data_frame.iat[row, raw_data_type_col]),
-                int(interface_data_frame.iat[row, destination_module_col]),
-                int(interface_data_frame.iat[row, destination_signal_col]),
-                int(interface_data_frame.iat[row, fixed_data_type_col]),
-                int(interface_data_frame.iat[row, fixed_target_signal_col])
-            )
-            execute_sql(conn, sql_external_signal, external_signal_data)
+        # write_to_excel(interface_data_frame, 'if_after.xlsx', 'blah')
+        interface_data_frame.to_sql('external_signals', conn, if_exists='append', index=False)
 
         # Commit changes to database and disconnect from it
         commit_disconnect_database(conn)
@@ -441,6 +508,7 @@ def create_data_list(input_file):
     # Create column data_type from raw_data_type column and remove unwanted strings, arrays and values
     cdl_data_frame[data_type] = reg_replace(
         cdl_data_frame, 'raw_data_type', r'\[(.*){1,3}\]\[(.*){1,3}\]|\[(.*){1,3}\]', '')
+    cdl_data_frame['raw_data_type'] = replace(cdl_data_frame, 'raw_data_type', 'single[５]', 'single[5]')
     # Replace incorrect data type by 'float32'
     replace_string = {'UINT8', 'single', 'single ', 'Single'}
     for i in replace_string:
@@ -455,10 +523,15 @@ def create_data_list(input_file):
     # FC_common -> FC_Common
     cdl_data_frame['source_modname'] = replace(cdl_data_frame, 'source_modname', 'FC_common', 'FC_Common')
     # f_fail_Detect_State -> f_Fail_Detect_State
-    cdl_data_frame['source_signame'] = replace(cdl_data_frame, 'source_signame', 'f_fail_Detect_State', 'f_Fail_Detect_State')
-    cdl_data_frame['model_signal_name'] = replace(cdl_data_frame, 'model_signal_name', 'f_fail_Detect_State', 'f_Fail_Detect_State')
+    cdl_data_frame['source_signame'] = replace(cdl_data_frame, 'source_signame', 'f_fail_Detect_State',
+                                               'f_Fail_Detect_State')
+    cdl_data_frame['model_signal_name'] = replace(cdl_data_frame, 'model_signal_name', 'f_fail_Detect_State',
+                                                  'f_Fail_Detect_State')
     # Gdel -> GDel
     cdl_data_frame['destination_signame'] = replace(cdl_data_frame, 'destination_signame', 'Gdel', 'GDel')
+    # 2 destination signals in one row -> np.nan
+    cdl_data_frame['destination_signame'] = replace(cdl_data_frame, 'destination_signame',
+                                                    'EYE22C_4_5_REQ_FMW\nEYE221_4_5_REQ_FMW', np.nan)
     # LCT_Yaw_Rad -> LCT_Yaw_rad
     cdl_data_frame['source_signame'] = replace(cdl_data_frame, 'source_signame', 'LCT_Yaw_Rad', 'LCT_Yaw_rad')
     # VspdCan -> VSpdCan
@@ -537,7 +610,7 @@ def create_data_list(input_file):
     # Extract array size from raw_data_type
     cdl_data_frame[array_size] = reg_replace(
         cdl_data_frame, 'raw_data_type', r'^\w*\d{0,2}[^\[]|(\[\D+\]|\[\D+\]\[\D+\])', '')
-        
+
     # Create global signal name for declarations in stubs
     cdl_data_frame[module_signal] = cdl_data_frame['target_model_name'] + '_' + cdl_data_frame[signal_name]
 
@@ -608,8 +681,9 @@ def create_data_list(input_file):
     for row in range(cdl_data_frame.shape[0]):
         cdl_data_frame.iat[row, fixed_array_size_col] = array_size_list[cdl_data_frame.iat[row, module_signal_col]]
     # Save the updated interface list to an Excel file
+    print('Generating output an Excel file for the interface signal information. Please wait..')
     write_to_excel(cdl_data_frame, 'InterfaceList.xlsx', 'IF Information')
-    print('Done processing interface signal information')
+    print('Done!')
 
     ### Start trial here
     create_function_calls(cdl_data_frame)

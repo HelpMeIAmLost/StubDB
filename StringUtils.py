@@ -1,3 +1,5 @@
+from common_util import *
+
 import os
 
 
@@ -27,6 +29,8 @@ def insert_lines_of_code(section, filename, data_frame, string, skip_count, spac
     line_number = find_section_header(filename, string, skip_count)
 
     if line_number > 0:
+        conn = create_connection('interface.db')
+        module_name = filename[filename.find('\\')+1:filename.find('.')]
         line_number = line_number + skip_count
         os.rename(filename, '{}.tmp'.format(filename))
         current_line = 1
@@ -35,6 +39,18 @@ def insert_lines_of_code(section, filename, data_frame, string, skip_count, spac
         with open('{}.tmp'.format(filename), 'r') as fi:
             with open(filename, 'w') as fo:
                 for line in fi:
+                    # Check for function call timing
+                    if line.find('FUNC(void, {}_CODE) Run_{}'.format(module_name, module_name)) != -1:
+                        if str(module_name).find('ms') != -1:
+                            cycle_ms = module_name[module_name.find('_')+1:module_name.find('ms')]
+                        else:
+                            cycle_ms = line[line.find('Run_{}_'.format(module_name))+len(
+                                'Run_{}_'.format(module_name)):line.find('ms')]
+                        execute_sql(conn,
+                                    '''UPDATE internal_signals SET cycle_ms = ? WHERE module = ?''',
+                                    (cycle_ms, module_name)
+                                    )
+                        commit_disconnect_database(conn)
                     if section == 'functions':
                         if line == ' * Input Interfaces:\n':
                             rte_api_list_found = True
@@ -62,7 +78,7 @@ def insert_lines_of_code(section, filename, data_frame, string, skip_count, spac
                                 if rte_api_found:
                                     fo.write('{}{}\n'.format(spaces, row))
                                 else:
-                                    fo.write('// {}{}\n'.format(spaces, row))
+                                    fo.write('{}// {}\n'.format(spaces, row))
                                     continue
             fo.close()
         fi.close()
