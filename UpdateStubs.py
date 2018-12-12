@@ -50,7 +50,7 @@ def filter_data(args):
                             print('Failed to insert RTE read and write function calls for {}'.format(file[:-2]))
 
 
-debug = True
+debug = False
 # Read arguments
 parser = argparse.ArgumentParser()
 if debug:

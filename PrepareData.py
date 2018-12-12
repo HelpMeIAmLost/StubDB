@@ -693,7 +693,7 @@ def create_data_list(input_file):
     print('Done preparing interface I/O data for testing')
 
 
-debug = True
+debug = False
 parser = argparse.ArgumentParser()
 if debug:
     parser.add_argument('-i', dest='input_file', default='【SASB連-2018-21】外部IF定義書_暫定版.xlsx')
