@@ -9,6 +9,7 @@ Stubs/
 Stubs_o/
 *.db
 log.txt
+StringUtils.py
 
 # C extensions
 *.so
