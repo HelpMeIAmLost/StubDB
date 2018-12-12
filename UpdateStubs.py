@@ -5,6 +5,8 @@ from pathlib import Path
 import os
 import argparse
 
+MIN_PYTHON = (3, 7)
+
 data_handler = {'declarations': ['GlobalDeclarationsList.xlsx', 'Global Declarations', 'A:B', OFF],
                'functions': ['RTEFunctionCalls.xlsx', 'RTE Function Calls', 'A:B', OFF]}
 
@@ -49,6 +51,9 @@ def filter_data(args):
                         else:
                             print('Failed to insert RTE read and write function calls for {}'.format(file[:-2]))
 
+
+if sys.version_info < MIN_PYTHON:
+    sys.exit("Python %s.%s or later is required. Please check your Python version.\n" % MIN_PYTHON)
 
 debug = False
 # Read arguments

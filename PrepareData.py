@@ -3,7 +3,8 @@ from StringUtils import *
 
 import numpy as np
 import argparse
-# import unicodedata
+
+MIN_PYTHON = (3, 7)
 
 # Column header indices
 target_module_col = 0
@@ -692,6 +693,9 @@ def create_data_list(input_file):
     ### End trial here
     print('Done preparing interface I/O data for testing')
 
+
+if sys.version_info < MIN_PYTHON:
+    sys.exit("Python %s.%s or later is required. Please check your Python version.\n" % MIN_PYTHON)
 
 debug = False
 parser = argparse.ArgumentParser()
