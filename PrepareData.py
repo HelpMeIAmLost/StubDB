@@ -1,8 +1,8 @@
 from common_util import *
-from StringUtils import *
 
 import numpy as np
 import argparse
+import sys
 
 MIN_PYTHON = (3, 7)
 

@@ -1,14 +1,14 @@
 from common_util import *
-from StringUtils import *
 from pathlib import Path
 
 import os
 import argparse
+import sys
 
 MIN_PYTHON = (3, 7)
 
 data_handler = {'declarations': ['GlobalDeclarationsList.xlsx', 'Global Declarations', 'A:B', OFF],
-               'functions': ['RTEFunctionCalls.xlsx', 'RTE Function Calls', 'A:B', OFF]}
+                'functions': ['RTEFunctionCalls.xlsx', 'RTE Function Calls', 'A:B', OFF]}
 
 
 def filter_data(args):
